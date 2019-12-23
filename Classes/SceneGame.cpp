@@ -50,8 +50,12 @@ bool SceneGame::init(bool red)
         _s[i] = Stone::create(i, red);
         this->addChild(_s[i]);
 
-        _s[i]->setPosition(ccp(_s[i]->getX()*_d, _s[i]->getY()*_d) + _stoneOffset);
+        _s[i]->setPosition(ccp(CCRANDOM_0_1()*winSize.width, CCRANDOM_0_1()*winSize.height));
+        CCMoveTo* move = CCMoveTo::create(1,getStonePos(_s[i]->getX(), _s[i]->getY()));
+        _s[i]->runAction(move);
     }
+
+    //游戏状态
     _selectid = -1;
     _selectSprite = CCSprite::create("selected.png");
     this->addChild(_selectSprite);
@@ -69,6 +73,7 @@ bool SceneGame::init(bool red)
     menu->addChild(item);
     menu->setPosition(ccp(winSize.width/2+200, winSize.height/2));
     addChild(menu);
+
     //创建悔棋array
     _steps = CCArray::create();
     _steps->retain();
@@ -77,6 +82,11 @@ bool SceneGame::init(bool red)
     _redSide = red;
 
     return true;
+}
+
+void SceneGame::setRealPos(Stone *s)
+{
+    s->setPosition(getStonePos(s->getX(), s->getY()));
 }
 
 void SceneGame::back(CCObject *)
@@ -109,9 +119,13 @@ void SceneGame::setSelectID(int id)
 
 void SceneGame::moveStone(int moveid, int killid, int x, int y)
 {
+    //moveStone分两步
+    //1.执行走棋
+    //2.处理死棋的结果
     //if(killid == -1) return;//这么写是有bug的 只有当killid有子时才能move过去 显然不对
     if(killid != -1 && _s[moveid]->getRed() == _s[killid]->getRed())
     {
+        //更换选择
         setSelectID(killid);
         return;
     }
@@ -119,6 +133,24 @@ void SceneGame::moveStone(int moveid, int killid, int x, int y)
     Step* step = Step::create(moveid,killid,_s[moveid]->getX(),_s[moveid]->getY(),x,y);
     _steps->addObject(step);
 
+    //moveid不受killid影响 (x,y)应该在上一个判断中判断过为合法坐标 moveid可以移动
+    _s[moveid]->setX(x);
+    _s[moveid]->setY(y);
+    CCMoveTo* move = CCMoveTo::create(.75f, getStonePos(x,y));
+    CCCallFuncND* call = CCCallFuncND::create(this,
+                                     callfuncND_selector(SceneGame::moveComplete),
+                                     (void*)(intptr_t)killid);
+    CCSequence* seq = CCSequence::create(move, call, NULL);
+    _s[moveid]->setZOrder(_s[moveid]->getZOrder()+1);
+    _s[moveid]->runAction(seq);
+    _selectSprite->setVisible(false);
+    // setRealPos(_s[moveid]);
+}
+
+void SceneGame::moveComplete(CCNode* moveStone, void* _killid)
+{
+    moveStone->setZOrder(moveStone->getZOrder()-1);
+    int killid = (int)(intptr_t)_killid;
     if(killid != -1)
     {
         _s[killid]->setDead(true);
@@ -130,13 +162,7 @@ void SceneGame::moveStone(int moveid, int killid, int x, int y)
         }
     }
 
-    //moveid不受killid影响 (x,y)应该在上一个判断中判断过为合法坐标 moveid可以移动
-    _s[moveid]->setX(x);
-    _s[moveid]->setY(y);
-    _s[moveid]->setPosition(getStonePos(x,y));
-
     _selectid = -1;
-    _selectSprite->setVisible(false);
     _redTurn = !_redTurn;
 }
 

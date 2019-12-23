@@ -39,29 +39,39 @@ public:
 
     CCSize winSize = CCDirector::sharedDirector()->getWinSize();
 
+    // cocos相关的
     static CCScene* scene(bool red);
     static SceneGame* create(bool red);
-
     bool init(bool red);
 
-    CCPoint _plateOffset;
+    //棋盘相关的
+    CCPoint _plateOffset; //背景偏移
     CCPoint _stoneOffset; //第一个棋子的显示坐标
     float _d;
-    Stone* _s[32];
 
-    bool ccTouchBegan(CCTouch *pTouch, CCEvent*);
-    int _selectid = -1;
-    bool getClickPos(CCPoint ptInWin, int& x, int& y);
-    int getStone(int x, int y);
-    void setSelectID(int id);
-    CCSprite* _selectSprite;
-    void moveStone(int moveid, int killid, int x, int y);
-    CCPoint getStonePos(int x, int y);
+    //游戏状态
     bool _redTurn;
     bool _redSide;
-
-    void back(CCObject*);
+    int _selectid = -1;
+    CCSprite* _selectSprite;
     CCArray* _steps;
+
+    Stone* _s[32];
+
+    //选棋+走棋
+    void setSelectID(int id);
+    void moveStone(int moveid, int killid, int x, int y);
+    void moveComplete(CCNode* , void*);
+
+    //坐标转换/辅助计算/内部调用
+    bool getClickPos(CCPoint ptInWin, int& x, int& y);
+    int getStone(int x, int y);
+    CCPoint getStonePos(int x, int y);
+    void setRealPos(Stone* s);
+
+    //cocos相关
+    bool ccTouchBegan(CCTouch *pTouch, CCEvent*);
+    void back(CCObject*);
 };
 
 #endif // SCENEGAME_H

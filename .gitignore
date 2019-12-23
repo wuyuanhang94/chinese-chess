@@ -1,2 +1,2 @@
-proj.linux/bin/
-proj.linux/obj/
+proj.linux/bin/*
+proj.linux/obj/*
