@@ -60,14 +60,26 @@ public:
 
     //选棋+走棋
     void setSelectID(int id);
+    //x,y是dest coordinates
     void moveStone(int moveid, int killid, int x, int y);
     void moveComplete(CCNode* , void*);
+
+    //走棋判断
+    bool canMove(int moveid, int killid, int x, int y);
+    bool canMoveJiang(int moveid, int killid, int x, int y);
+    bool canMoveShi(int moveid, int x, int y);
+    bool canMoveXiang(int moveid, int x, int y);
+    bool canMoveChe(int moveid, int x, int y);
+    bool canMoveMa(int moveid, int x, int y);
+    bool canMovePao(int moveid, int killid, int x, int y);
+    bool canMoveBing(int moveid, int x, int y);
 
     //坐标转换/辅助计算/内部调用
     bool getClickPos(CCPoint ptInWin, int& x, int& y);
     int getStone(int x, int y);
     CCPoint getStonePos(int x, int y);
     void setRealPos(Stone* s);
+    int getStoneCount(int xo, int yo, int x, int y);
 
     //cocos相关
     bool ccTouchBegan(CCTouch *pTouch, CCEvent*);

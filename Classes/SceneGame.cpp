@@ -1,4 +1,7 @@
 #include "SceneGame.h"
+#include <algorithm>
+
+using namespace std;
 
 SceneGame::SceneGame()
 {
@@ -117,6 +120,205 @@ void SceneGame::setSelectID(int id)
     _selectSprite->setPosition(_s[_selectid]->getPosition());
 }
 
+bool SceneGame::canMoveJiang(int moveid, int killid, int x, int y)
+{
+    //老将照面 特殊处理
+    Stone* killStone = _s[killid];
+    if(killStone->getType() == Stone::JIANG)
+        return canMoveChe(moveid,x,y);
+
+    Stone* s = _s[moveid];
+    //1.走一步
+    //2.不能出九宫
+    int xo = s->getX();
+    int yo = s->getY();
+    int xoff = abs(xo - x);
+    int yoff = abs(yo - y);
+    if(xoff > 1 || yoff > 1 || xoff+yoff != 1) return false;
+    //不能出九宫 有两种情况
+    // 黑or红
+    //......
+    //......
+    // 红 黑
+    //ture false // _redSide
+    if(x < 3 || x > 5) return false;
+    if(_redSide == s->getRed())
+    {
+        if(y < 0 || y > 2) return false;
+    }
+    else
+    {
+        if(y < 7 || y > 9) return false;
+    }
+    return true;
+}
+
+bool SceneGame::canMoveShi(int moveid, int x, int y)
+{
+    Stone* s = _s[moveid];
+    //1.走一步 走对角线
+    //2.不能出九宫
+    int xo = s->getX();
+    int yo = s->getY();
+    int xoff = abs(xo - x);
+    int yoff = abs(yo - y);
+    if(xoff !=1 || yoff != 1) return false;
+
+    if(x < 3 || x > 5) return false;
+    if(_redSide == s->getRed())
+    {
+        if(y < 0 || y > 2) return false;
+    }
+    else
+    {
+        if(y < 7 || y > 9) return false;
+    }
+    return true;
+}
+
+bool SceneGame::canMoveXiang(int moveid, int x, int y)
+{
+    Stone* s = _s[moveid];
+    //1.走一步 走对角线
+    //2.xoff yoff 都为2
+    //3.象眼
+    int xo = s->getX();
+    int yo = s->getY();
+    int xoff = abs(xo - x);
+    int yoff = abs(yo - y);
+    if(xoff != 2 || yoff != 2) return false;
+
+    if(_redSide == s->getRed())
+    {
+        if(y < 0 || y > 4) return false;
+    }
+    else
+    {
+        if(y < 5 || y > 9) return false;
+    }
+
+    int xmid = (x+xo)/2;
+    int ymid = (y+yo)/2;
+    if(getStone(xmid, ymid) != -1) return false;
+    return true;
+}
+
+int SceneGame::getStoneCount(int xo, int yo, int x, int y)
+{
+    //to calculate how many stones lie from (xo,yo) to (x,y) in the same line
+    if(xo != x && yo != y) return -1;
+    int cnt = 0;
+    if(xo == x)
+    {
+        int ymin = min(y,yo);
+        int ymax = max(y,yo);
+        for(int j=ymin+1;j<ymax;j++)
+            if(getStone(x,j) != -1) cnt++;
+    }
+    else
+    {
+        int xmin = min(x,xo);
+        int xmax = max(x,xo);
+        for(int i=xmin+1;i<xmax;i++)
+            if(getStone(i,y) != -1) cnt++;
+    }
+    return cnt;
+}
+
+bool SceneGame::canMoveChe(int moveid, int x, int y)
+{
+    //1.走直线
+    //2.中间不能有阻拦
+    Stone* s = _s[moveid];
+
+    int xo = s->getX();
+    int yo = s->getY();
+    if(getStoneCount(xo,yo,x,y) != 0) return false;
+    return true;
+}
+
+bool SceneGame::canMoveMa(int moveid, int x, int y)
+{
+    Stone* s = _s[moveid];
+    //1.走日 xoff yoff
+    //2.马眼
+    int xo = s->getX();
+    int yo = s->getY();
+    int xoff = abs(xo - x);
+    int yoff = abs(yo - y);
+    int d = xoff*10 + yoff;
+    if(d != 21 && d != 12) return false;
+
+    if(d == 21 && getStone((x+xo)/2, yo) != -1) return false;
+    if(d == 12 && getStone(xo, (y+yo)/2) != -1) return false;
+    return true;
+}
+
+bool SceneGame::canMovePao(int moveid, int killid, int x, int y)
+{
+    Stone* s = _s[moveid];
+
+    int xo = s->getX();
+    int yo = s->getY();
+    if(killid == -1) return canMoveChe(moveid, x, y);
+    if(getStoneCount(xo,yo,x,y) != 1) return false;
+    return true;
+}
+
+bool SceneGame::canMoveBing(int moveid, int x, int y)
+{
+    Stone* s = _s[moveid];
+    //1.走一步
+    //2.不能回头
+    int xo = s->getX();
+    int yo = s->getY();
+    int xoff = abs(xo - x);
+    int yoff = abs(yo - y);
+    int d = 10*xoff + yoff;
+    if(d != 1 && d != 10) return false;
+
+    if(_redSide == s->getRed())
+    {
+        if(y < yo) return false;//不能回头
+        if(yo <= 4 && y == yo) return false;
+    }
+    else
+    {
+        if(y > yo) return false;//不能回头
+        if(yo >= 5 && y == yo) return false;
+    }
+    return true;
+}
+
+bool SceneGame::canMove(int moveid, int killid, int x, int y)
+{
+    Stone* s = _s[moveid];
+    switch (s->getType()) {
+    case Stone::JIANG:
+        return canMoveJiang(moveid, killid, x, y);
+        break;
+    case Stone::SHI:
+        return canMoveShi(moveid, x, y);
+        break;
+    case Stone::XIANG:
+        return canMoveXiang(moveid, x, y);
+        break;
+    case Stone::CHE:
+        return canMoveChe(moveid, x, y);
+        break;
+    case Stone::MA:
+        return canMoveMa(moveid, x, y);
+        break;
+    case Stone::PAO:
+        return canMovePao(moveid, killid, x, y);
+        break;
+    case Stone::BING:
+        return canMoveBing(moveid, x, y);
+        break;
+    }
+    return false;
+}
+
 void SceneGame::moveStone(int moveid, int killid, int x, int y)
 {
     //moveStone分两步
@@ -129,6 +331,9 @@ void SceneGame::moveStone(int moveid, int killid, int x, int y)
         setSelectID(killid);
         return;
     }
+
+    bool bCanMove = canMove(moveid, killid, x, y);
+    if(!bCanMove) return;
 
     Step* step = Step::create(moveid,killid,_s[moveid]->getX(),_s[moveid]->getY(),x,y);
     _steps->addObject(step);
