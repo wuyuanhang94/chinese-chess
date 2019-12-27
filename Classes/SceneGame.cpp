@@ -123,9 +123,12 @@ void SceneGame::setSelectID(int id)
 bool SceneGame::canMoveJiang(int moveid, int killid, int x, int y)
 {
     //老将照面 特殊处理
-    Stone* killStone = _s[killid];
-    if(killStone->getType() == Stone::JIANG)
-        return canMoveChe(moveid,x,y);
+    if(killid != -1)
+    {
+        Stone* killStone = _s[killid];
+        if(killStone->getType() == Stone::JIANG)
+            return canMoveChe(moveid,x,y);
+    }
 
     Stone* s = _s[moveid];
     //1.走一步
