@@ -9,7 +9,10 @@
 #include <fcntl.h>
 #include <errno.h>
 #include "cocos2d.h"
+USING_NS_CC;
 
+// 问题1： port没释放导致卡死
+// 问题2： 阻塞式socket
 Net* Net::getInstance()
 {
     static Net* ret = NULL;
@@ -59,6 +62,11 @@ bool Net::accept()
     if(_srv == -1) return false;
 
     _client = ::accept(_srv, NULL, NULL);
+    if(_client == -1)
+    {
+        CCLog("accept error");
+        return false;
+    }
     setNonblock(_client);
     return _client != -1;
 }
@@ -69,11 +77,24 @@ int Net::send(const char *buf, int size)
     return ::send(_client, buf, size, 0);
 }
 
-void Net::recv()
+bool Net::recv()
 {
-    if(_client == -1) return;
-    int ret = ::recv(_client, _packet + _recvlen, 1, 0);
-    if(ret == 1) _recvlen++;
+    if(_client == -1) return false;
+    while(1)
+    {
+        int ret = ::recv(_client, _packet + _recvlen, 1, 0);
+        if(ret > 0)
+        {
+            _recvlen++;
+            if(isPacketReady()) return true;
+        }
+        else if(ret < 0 && errno == EAGAIN) return false;
+        else
+        {
+            CCLog("Sokcet error");
+        }
+    }
+    return false;
 }
 
 bool Net::isPacketReady()
@@ -90,7 +111,7 @@ bool Net::isPacketReady()
     case 3:
         return _recvlen == 1;
     }
-    CCAssert(0, "packer error");
+    CCAssert(0, "packet error");
     return false;
 }
 
@@ -109,7 +130,7 @@ bool Net::connect(short port, const char *ip)
     {
         close(_client);
         _client = -1;
-        CCLog("connect error, errno=%d", errnos);
+        CCLog("connect error, errno=%d", errno);
         return false;
     }
     setNonblock(_client);

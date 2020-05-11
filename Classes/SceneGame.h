@@ -85,6 +85,10 @@ public:
     //cocos相关
     bool ccTouchBegan(CCTouch *pTouch, CCEvent*);
     void back(CCObject*);
+    void doRealBack();
+
+    void surrender(CCObject*);
+    void resetGame();
 
     //网络相关
     void makeServer(CCObject*);

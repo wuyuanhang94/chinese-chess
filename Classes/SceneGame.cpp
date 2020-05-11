@@ -91,16 +91,32 @@ bool SceneGame::init(bool red)
                                                   this,menu_selector(SceneGame::makeClient));
     menu->addChild(itemS);
     menu->addChild(itemC);
-    itemS->setPosition(item->getPosition() + ccp(0,30));
-    itemC->setPosition(item->getPosition() + ccp(0,60));
+    itemS->setPosition(item->getPosition() + ccp(0,50));
+    itemC->setPosition(item->getPosition() + ccp(0,100));
 
     // 两个按钮互斥 选择一个就不能选另一个 同时选择本身好了不能重复选择 禁用
     itemS->setUserObject(itemC);
     itemC->setUserObject(itemS);
 
+    CCMenuItem* itemSurrender = CCMenuItemFont::create("Surrender", this, \
+                                              menu_selector(SceneGame::surrender));
+    itemSurrender->setPosition(item->getPosition() - ccp(0, 50));
+    menu->addChild(itemSurrender);
+
     return true;
 }
 
+void SceneGame::surrender(CCObject *)
+{
+    char buf[2];
+    buf[0] = 4;
+    buf[1] = _redSide;
+
+    Net::getInstance()->send(buf, 2);
+    resetGame();
+}
+
+//阻塞式socket太卡了 还是需要非阻塞的
 void SceneGame::accept(float dt)
 {
     bool b = Net::getInstance()->accept();
@@ -113,12 +129,14 @@ void SceneGame::accept(float dt)
         buf[0] = 0;
         buf[1] = _redSide ? 0 : 1;
         Net::getInstance()->send(buf,2);
+        //server收消息
+        schedule(schedule_selector(SceneGame::recv), 1.0f);
     }
 }
 
 void SceneGame::makeServer(CCObject* item)
 {
-    if(Net::getInstance()->listen(9898))
+    if(Net::getInstance()->listen(9999))
     {
         CCMenuItem* menuItem = (CCMenuItem*)item;
         menuItem->setEnabled(false);
@@ -131,7 +149,7 @@ void SceneGame::makeServer(CCObject* item)
 
 void SceneGame::makeClient(CCObject* item)
 {
-    if(Net::getInstance()->connect(9898, "127.0.0.1"))
+    if(Net::getInstance()->connect(9999, "127.0.0.1"))
     {
         CCMenuItem* menuItem = (CCMenuItem*)item;
         menuItem->setEnabled(false);
@@ -142,17 +160,44 @@ void SceneGame::makeClient(CCObject* item)
     }
 }
 
-void SceneGame::recv(float dt)
+void SceneGame::resetGame()
 {
-    Net::getInstance()->recv();
-    if(Net::getInstance()->isPacketReady())
+    _redSide = !_redSide;
+    _redTurn = true;
+    _selectid = -1;
+    _selectSprite->setVisible(false);
+    //32个棋子reset
+    for(int i=0;i<32;i++)
+    {
+        Stone* s = _s[i];
+        s->reset(_redSide);
+        setRealPos(s);
+    }
+    _steps->removeAllObjects();
+}
+
+void SceneGame::recv(float)
+{
+    bool bSuccess = Net::getInstance()->recv();
+    if(bSuccess)
     {
         char* buf = Net::getInstance()->_packet;
         Net::getInstance()->_recvlen = 0;
         switch(buf[0])
         {
         case 0:
-            CCDirector::sharedDirector()->replaceScene(SceneGame::scene(buf[1]));
+            // 这里是重大bug replaceScene 重新开始
+            // recv不再侦听
+            //CCDirector::sharedDirector()->replaceScene(SceneGame::scene(buf[1]));
+        {
+            for(int i=0;i<32;i++)
+            {
+                Stone* s = _s[i];
+                s->reset(buf[1]);
+                setRealPos(s);
+                _redSide = buf[1];
+            }
+        }
             break;
         case 1:
             setSelectID(buf[1]);
@@ -160,12 +205,38 @@ void SceneGame::recv(float dt)
         case 2:
         {
             int killid = getStone(buf[2], buf[3]);
-            moveStone(buf[1],killid,buf[2],buf[3]);
+            moveStone(buf[1], killid, buf[2], buf[3]);
+            //如果老将干掉了 reset 游戏
+            if(_redSide)
+            {
+                for(int i=0;i<16;i++)
+                {
+                    Stone* s = _s[i];
+                    if(s->getType() == Stone::JIANG && s->getDead())
+                        surrender(NULL);
+                }
+            }
+            else
+            {
+                for(int i=16;i<32;i++)
+                {
+                    Stone* s = _s[i];
+                    if(s->getType() == Stone::JIANG && s->getDead())
+                        surrender(NULL);
+                }
+            }
         }
             break;
         case 3:
+        {
+            doRealBack();
+            doRealBack();
+        }
             break;
         case 4:
+        {
+            resetGame();
+        }
             break;
         }
     }
@@ -176,7 +247,7 @@ void SceneGame::setRealPos(Stone *s)
     s->setPosition(getStonePos(s->getX(), s->getY()));
 }
 
-void SceneGame::back(CCObject *)
+void SceneGame::doRealBack()
 {
     if(_steps->count() == 0) return;
 
@@ -193,6 +264,14 @@ void SceneGame::back(CCObject *)
     }
 
     _redTurn = !_redTurn;
+}
+
+void SceneGame::back(CCObject *)
+{
+    doRealBack();
+    doRealBack();
+    char buf = 3;
+    Net::getInstance()->send(&buf, 1);
 }
 
 void SceneGame::setSelectID(int id)
@@ -447,11 +526,12 @@ void SceneGame::moveComplete(CCNode* moveStone, void* _killid)
     {
         _s[killid]->setDead(true);
         _s[killid]->setVisible(false);
-
+#if 0
         if(_s[killid]->getType() == Stone::JIANG)
         {
             CCDirector::sharedDirector()->replaceScene(SceneGame::scene(!_redSide));
         }
+#endif
     }
 
     _selectid = -1;
@@ -474,6 +554,8 @@ bool SceneGame::ccTouchBegan(CCTouch *pTouch, CCEvent *)
     int clickid = getStone(x,y);
     if(_selectid == -1)
     {
+        if(clickid == -1) return false;
+        if(_s[clickid]->getRed() != _redSide) return false;
         //发送选棋报文
         char buf[2];
         buf[0] = 1;

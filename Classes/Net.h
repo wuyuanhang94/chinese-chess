@@ -4,8 +4,8 @@
 class Net
 {
     // private ctor
+    // 禁止调用显式调用ctor
     Net();
-
 public:
     int _srv;
     int _client;
@@ -24,7 +24,7 @@ public:
 
     //APIs in common
     int send(const char* buf, int size);
-    void recv();
+    bool recv();
     bool isPacketReady();
     int setNonblock(int fd);
 };
