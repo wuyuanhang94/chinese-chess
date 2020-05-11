@@ -6,7 +6,8 @@ SOURCES = main.cpp \
         ../Classes/AppDelegate.cpp \
         ../Classes/SceneStart.cpp \
         ../Classes/SceneGame.cpp \
-        ../Classes/Stone.cpp
+        ../Classes/Stone.cpp \
+        ../Classes/Net.cpp
 
 COCOS_ROOT = ../../..
 include $(COCOS_ROOT)/cocos2dx/proj.linux/cocos2dx.mk

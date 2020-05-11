@@ -4,6 +4,7 @@
 #include "cocos2d.h"
 USING_NS_CC;
 #include "Stone.h"
+#include "Net.h"
 
 class Step : public CCObject
 {
@@ -84,6 +85,15 @@ public:
     //cocos相关
     bool ccTouchBegan(CCTouch *pTouch, CCEvent*);
     void back(CCObject*);
+
+    //网络相关
+    void makeServer(CCObject*);
+    void makeClient(CCObject*);
+    void accept(float dt);
+    void recv(float dt);
+    // 不能这么写 因为SceneGame析构net就断了
+    // 最差也是静态变量 最好单例
+    // Net* _net;
 };
 
 #endif // SCENEGAME_H

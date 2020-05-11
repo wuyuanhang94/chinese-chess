@@ -84,7 +84,91 @@ bool SceneGame::init(bool red)
     //干死老将后换边
     _redSide = red;
 
+    //server or client
+    CCMenuItemFont* itemS = CCMenuItemFont::create("MakeServer",
+                                                  this,menu_selector(SceneGame::makeServer));
+    CCMenuItemFont* itemC = CCMenuItemFont::create("MakeClient",
+                                                  this,menu_selector(SceneGame::makeClient));
+    menu->addChild(itemS);
+    menu->addChild(itemC);
+    itemS->setPosition(item->getPosition() + ccp(0,30));
+    itemC->setPosition(item->getPosition() + ccp(0,60));
+
+    // 两个按钮互斥 选择一个就不能选另一个 同时选择本身好了不能重复选择 禁用
+    itemS->setUserObject(itemC);
+    itemC->setUserObject(itemS);
+
     return true;
+}
+
+void SceneGame::accept(float dt)
+{
+    bool b = Net::getInstance()->accept();
+    if(b)
+    {
+        CCLog("Connect successfully");
+        unschedule(schedule_selector(SceneGame::accept));
+
+        char buf[2];
+        buf[0] = 0;
+        buf[1] = _redSide ? 0 : 1;
+        Net::getInstance()->send(buf,2);
+    }
+}
+
+void SceneGame::makeServer(CCObject* item)
+{
+    if(Net::getInstance()->listen(9898))
+    {
+        CCMenuItem* menuItem = (CCMenuItem*)item;
+        menuItem->setEnabled(false);
+        menuItem = (CCMenuItem*)menuItem->getUserObject();
+        menuItem->setEnabled(false);
+
+        schedule(schedule_selector(SceneGame::accept), 1.0f);
+    }
+}
+
+void SceneGame::makeClient(CCObject* item)
+{
+    if(Net::getInstance()->connect(9898, "127.0.0.1"))
+    {
+        CCMenuItem* menuItem = (CCMenuItem*)item;
+        menuItem->setEnabled(false);
+        menuItem = (CCMenuItem*)menuItem->getUserObject();
+        menuItem->setEnabled(false);
+
+        schedule(schedule_selector(SceneGame::recv), 1.0f);
+    }
+}
+
+void SceneGame::recv(float dt)
+{
+    Net::getInstance()->recv();
+    if(Net::getInstance()->isPacketReady())
+    {
+        char* buf = Net::getInstance()->_packet;
+        Net::getInstance()->_recvlen = 0;
+        switch(buf[0])
+        {
+        case 0:
+            CCDirector::sharedDirector()->replaceScene(SceneGame::scene(buf[1]));
+            break;
+        case 1:
+            setSelectID(buf[1]);
+            break;
+        case 2:
+        {
+            int killid = getStone(buf[2], buf[3]);
+            moveStone(buf[1],killid,buf[2],buf[3]);
+        }
+            break;
+        case 3:
+            break;
+        case 4:
+            break;
+        }
+    }
 }
 
 void SceneGame::setRealPos(Stone *s)
@@ -389,9 +473,27 @@ bool SceneGame::ccTouchBegan(CCTouch *pTouch, CCEvent *)
 
     int clickid = getStone(x,y);
     if(_selectid == -1)
+    {
+        //发送选棋报文
+        char buf[2];
+        buf[0] = 1;
+        buf[1] = clickid;
+        Net::getInstance()->send(buf,2);
+
         setSelectID(clickid);
+    }
     else
+    {
+        //发送走棋报文
+        char buf[4];
+        buf[0] = 2;
+        buf[1] = _selectid;
+        buf[2] = 8-x;
+        buf[3] = 9-y;
+        Net::getInstance()->send(buf,4);
+
         moveStone(_selectid, clickid, x, y);
+    }
     return true;
 }
 
